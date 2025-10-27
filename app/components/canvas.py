@@ -32,11 +32,13 @@ def canvas_toolbar() -> rx.Component:
             tool_button("Pan", "hand", "pan"),
             rx.el.button(
                 rx.icon("zoom-in", class_name="size-5"),
+                on_click=MainState.zoom_in,
                 title="Zoom In",
                 class_name="p-2 rounded-md hover:bg-neutral-200",
             ),
             rx.el.button(
                 rx.icon("zoom-out", class_name="size-5"),
+                on_click=MainState.zoom_out,
                 title="Zoom Out",
                 class_name="p-2 rounded-md hover:bg-neutral-200",
             ),
@@ -120,6 +122,24 @@ def shape_renderer(shape: Shape) -> rx.Component:
                     fill="none",
                 ),
             ),
+            (
+                "polygon",
+                rx.el.polygon(
+                    points=MainState.svg_points[shape["id"]],
+                    stroke=shape["stroke_color"],
+                    stroke_width=shape["stroke_mm"],
+                    fill=shape["fill_color"],
+                ),
+            ),
+            (
+                "freehand",
+                rx.el.svg.polyline(
+                    points=MainState.svg_points[shape["id"]],
+                    stroke=shape["stroke_color"],
+                    stroke_width=shape["stroke_mm"],
+                    fill="none",
+                ),
+            ),
             rx.el.g(),
         )
     )
@@ -127,6 +147,7 @@ def shape_renderer(shape: Shape) -> rx.Component:
 
 def canvas_area() -> rx.Component:
     """The main drawing canvas area with toolbar."""
+    svg_id = "drawing-canvas"
     return rx.el.div(
         canvas_toolbar(),
         rx.el.div(
@@ -139,13 +160,27 @@ def canvas_area() -> rx.Component:
                         rx.el.g(),
                     ),
                 ),
-                on_mouse_down=MainState.handle_canvas_mouse_down,
-                on_mouse_move=MainState.handle_canvas_mouse_move,
-                on_mouse_up=MainState.handle_canvas_mouse_up,
-                on_mouse_leave=MainState.handle_canvas_mouse_up,
-                viewBox=f"0 0 {MainState.plot_width_ft} {MainState.plot_height_ft}",
+                on_mouse_down=MainState.handle_canvas_mouse_down(
+                    rx.event.call_script(
+                        "(e) => ({ client_x: e.clientX, client_y: e.clientY, button: e.button, bounding_client_rect: e.target.getBoundingClientRect() })"
+                    )
+                ),
+                on_mouse_move=MainState.handle_canvas_mouse_move(
+                    rx.event.call_script(
+                        "(e) => ({ client_x: e.clientX, client_y: e.clientY, bounding_client_rect: e.target.getBoundingClientRect() })"
+                    )
+                ).throttle(16),
+                on_mouse_up=MainState.handle_canvas_mouse_up(
+                    rx.event.call_script(
+                        "(e) => ({ client_x: e.clientX, client_y: e.clientY, button: e.button, bounding_client_rect: e.target.getBoundingClientRect() })"
+                    )
+                ),
+                on_mouse_leave=MainState.handle_canvas_mouse_leave,
+                id=svg_id,
+                viewBox=MainState.viewbox_str,
                 preserve_aspect_ratio="xMidYMid meet",
                 class_name="w-full h-full bg-white shadow-inner border border-neutral-300",
+                style={"cursor": MainState.canvas_cursor},
             ),
             class_name="w-full h-full",
             style={"aspect-ratio": "1.414"},
